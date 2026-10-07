@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_blank">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>おく内科訪問患者マップ</title>
+  <style>
+    :root {
+      --blue: #1a73e8; --red: #d93025; --green: #188038; --text: #202124; --sub: #5f6368;
+      --line: #dadce0; --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+    }
+    html, body { margin: 0; height: 100%; overflow: hidden; font-family: Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif; color: var(--text); }
+    button { font-family: inherit; cursor: pointer; }
+    .hidden { display: none !important; }
+    svg { display: block; }
+    #login { max-width: 360px; margin: 12vh auto 0; padding: 32px 24px; border: 1px solid var(--line); border-radius: 8px; box-sizing: border-box; }
+    #login h1 { font-size: 22px; font-weight: 400; margin: 0 0 20px; text-align: center; }
+    #login input { display: block; width: 100%; box-sizing: border-box; font-size: 16px; padding: 13px 14px; margin: 10px 0; border: 1px solid var(--line); border-radius: 4px; }
+    #login input:focus { outline: 2px solid var(--blue); border-color: transparent; }
+    #login button { width: 100%; font-size: 15px; padding: 12px; border: 0; border-radius: 4px; background: var(--blue); color: #fff; margin-top: 8px; }
+    #loginMsg { color: var(--red); min-height: 1.5em; font-size: 14px; }
+    #map { position: absolute; inset: 0; }
+    #top { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5; max-width: 420px; }
+    #searchBox { display: flex; align-items: center; height: 48px; background: #fff; border-radius: 24px; box-shadow: var(--shadow); padding: 0 4px 0 16px; }
+    #searchBox .lead { color: var(--sub); flex: none; }
+    #search { flex: 1; min-width: 0; border: 0; outline: 0; font-size: 16px; padding: 0 10px; background: transparent; }
+    .round { flex: none; width: 40px; height: 40px; border: 0; border-radius: 20px; background: transparent; color: var(--sub); display: flex; align-items: center; justify-content: center; }
+    .round:active { background: #f1f3f4; }
+    #suggest { margin-top: 4px; background: #fff; border-radius: 12px; box-shadow: var(--shadow); max-height: 50vh; overflow-y: auto; }
+    .sug { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+    .sug:active, .sug:hover { background: #f8f9fa; }
+    .sug .pin { flex: none; width: 32px; height: 32px; border-radius: 16px; background: #f1f3f4; display: flex; align-items: center; justify-content: center; color: var(--sub); }
+    .sug .t { font-size: 15px; }
+    .sug .s { font-size: 13px; color: var(--sub); }
+    .sug.none { color: var(--sub); cursor: default; }
+    #chips { display: flex; gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .chip { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #fff; box-shadow: var(--shadow); border: 0; font-size: 14px; color: var(--text); white-space: nowrap; }
+    .chip.warn { background: #fce8e6; color: var(--red); }
+    .chiprow { display: flex; gap: 8px; margin-top: 6px; overflow-x: auto; padding-bottom: 4px; }
+    .chip.sel { background: #e8f0fe; color: #1967d2; box-shadow: var(--shadow), inset 0 0 0 1px #1967d2; }
+    .chip.off { opacity: .45; }
+    .chip .dot { width: 12px; height: 12px; border-radius: 6px; flex: none; }
+    .chip .sq { border-radius: 2px; }
+    .visit { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #f1f3f4; font-size: 15px; }
+    .visit .dot { width: 12px; height: 12px; border-radius: 6px; flex: none; }
+    .visit .sub { color: var(--sub); font-size: 13px; }
+    #menu { position: absolute; top: 54px; right: 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); padding: 6px 0; min-width: 180px; }
+    #menu button { display: flex; align-items: center; gap: 14px; width: 100%; font-size: 15px; padding: 12px 18px; border: 0; background: none; text-align: left; color: var(--text); }
+    #menu button:active { background: #f1f3f4; }
+    #fabs { position: absolute; right: 12px; bottom: 24px; z-index: 4; display: flex; flex-direction: column; gap: 12px; transition: bottom .2s; }
+    .fab { width: 48px; height: 48px; border-radius: 24px; border: 0; background: #fff; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; color: var(--sub); }
+    .fab.active { color: var(--blue); }
+    #sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: #fff; border-radius: 16px 16px 0 0;
+             box-shadow: 0 -2px 10px rgba(0,0,0,.2); max-height: 65vh; display: flex; flex-direction: column; }
+    #sheet.collapsed #sheetBody { display: none; }
+    #handle { padding: 8px 0 4px; touch-action: none; cursor: grab; }
+    #handle::before { content: ""; display: block; width: 32px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto; }
+    #sheetHead { display: flex; align-items: flex-start; gap: 8px; padding: 4px 16px 10px; }
+    #sheetTitle { flex: 1; min-width: 0; }
+    #sheetTitle h2 { font-size: 22px; font-weight: 400; margin: 0; }
+    #sheetTitle .s { color: var(--sub); font-size: 14px; margin-top: 2px; }
+    #sheetBody { overflow-y: auto; padding: 0 16px 16px; }
+    .close { background: #f1f3f4; }
+    .actions { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; }
+    .pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 18px; font-size: 14px; font-weight: 500;
+            border: 1px solid var(--line); background: #fff; color: var(--blue); text-decoration: none; }
+    .pill.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .pill.danger { color: var(--red); }
+    .pill.green { background: var(--green); border-color: var(--green); color: #fff; }
+    .row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid #f1f3f4; color: var(--text); font-size: 15px; }
+    .row .ic { color: var(--blue); flex: none; }
+    .route-opts { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; padding: 4px 0 8px; font-size: 14px; color: var(--sub); }
+    .route-opts input { font-size: 16px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--text); }
+    .route-opts input[type=number] { width: 4em; }
+    .stop { display: flex; align-items: center; gap: 12px; padding: 15px 0; border-top: 1px solid #f1f3f4; }
+    .stop .num { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--red); color: #fff; text-align: center; line-height: 26px; font-weight: bold; font-size: 13px; }
+    .stop .num.clinic { background: var(--green); }
+    .stop .body { flex: 1; min-width: 0; }
+    .stop .name { font-size: 15px; }
+    .stop .time { color: var(--blue); font-weight: 500; margin-right: 6px; }
+    .stop .sub { color: var(--sub); font-size: 13px; }
+    .stop .mini { flex: none; width: 32px; height: 32px; border-radius: 16px; border: 0; background: transparent; color: var(--sub); display: flex; align-items: center; justify-content: center; }
+    .stop .ctl { flex: none; display: flex; }
+    .slot { position: relative; height: 0; z-index: 1; }
+    .slot button { position: absolute; left: 50%; top: -13px; transform: translateX(-50%); width: 26px; height: 26px; border-radius: 13px; padding: 0;
+                   border: 1px solid var(--line); background: #fff; color: var(--sub); display: flex; align-items: center; justify-content: center; }
+    .slot button.on { color: var(--blue); border-color: var(--blue); }
+    .slot button svg { width: 18px; height: 18px; }
+    .stop .mini:disabled { opacity: .3; }
+    .stop a.mini { color: var(--blue); text-decoration: none; }
+    #routeSummary { font-size: 15px; padding: 10px 0 4px; }
+    #routeSummary b { color: var(--green); font-size: 18px; font-weight: 500; }
+    #routeMsg { color: var(--red); font-size: 14px; }
+    .note { color: var(--sub); font-size: 12px; margin-top: 6px; }
+    #routeAdd { margin: 16px 0 6px 38px; padding: 8px 10px; border-radius: 8px; background: #f8f9fa; }
+    #routeAdd .head { display: flex; align-items: center; justify-content: space-between; margin: -4px 0 6px; }
+    #routeAdd h3 { font-size: 14px; font-weight: 500; margin: 0; color: var(--sub); }
+    #routeAddCancel { border: 0; background: none; color: var(--blue); font-size: 14px; font-weight: 500; padding: 6px 4px; }
+    #routeAddQ { width: 100%; box-sizing: border-box; font-size: 16px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+    .cand { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+    .cand:active { background: #f8f9fa; }
+    .cand .dot { width: 12px; height: 12px; border-radius: 6px; flex: none; background: #9aa0a6; }
+    .cand .body { flex: 1; min-width: 0; }
+    .cand .t { font-size: 15px; }
+    .cand .s { font-size: 13px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cand .plus { flex: none; color: var(--blue); display: flex; }
+    #toast { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); z-index: 20; background: #323232; color: #fff;
+             padding: 12px 18px; border-radius: 6px; font-size: 14px; max-width: 86vw; box-shadow: var(--shadow); }
+    @media (min-width: 800px) {
+      #top { max-width: 392px; }
+      #sheet { left: 10px; right: auto; width: 392px; bottom: 10px; border-radius: 12px; max-height: calc(100vh - 140px); }
+      #fabs { bottom: 110px; }
+      #toast { bottom: 30px; }
+    }
+  </style>
+</head>
+<body>
+  <form id="login" class="hidden">
+    <h1>おく内科訪問患者マップ</h1>
+    <input id="loginId" placeholder="ID" autocomplete="username" autocapitalize="off">
+    <input id="loginPw" type="password" placeholder="パスワード" autocomplete="current-password">
+    <div id="loginMsg"></div>
+    <button type="submit">ログイン</button>
+  </form>
+  <div id="app" class="hidden">
+    <div id="map"></div>
+    <div id="top">
+      <div id="searchBox">
+        <span class="lead" data-icon="search"></span>
+        <input id="search" placeholder="患者名・住所で検索" autocomplete="off" enterkeyhint="search">
+        <button id="searchClear" class="round hidden" type="button" aria-label="クリア" data-icon="close"></button>
+        <button id="menuBtn" class="round" type="button" aria-label="メニュー" data-icon="more"></button>
+      </div>
+      <div id="menu" class="hidden">
+        <button id="refresh" type="button"><span data-icon="refresh"></span>地図を更新</button>
+        <button id="logout" type="button"><span data-icon="logout"></span>ログアウト</button>
+      </div>
+      <div id="suggest" class="hidden"></div>
+      <div id="chips">
+        <span id="countChip" class="chip">読み込み中…</span>
+        <span id="issueChip" class="chip warn hidden"></span>
+        <button id="missingChip" class="chip warn hidden" type="button"></button>
+        <button id="routeChip" class="chip hidden" type="button"><span data-icon="route"></span><span id="routeChipText"></span></button>
+      </div>
+      <div id="dayChips" class="chiprow hidden"></div>
+      <div id="filterChips" class="chiprow hidden"></div>
+    </div>
+    <div id="fabs">
+      <button id="locate" class="fab" type="button" aria-label="現在地" data-icon="mylocation"></button>
+    </div>
+    <div id="sheet" class="hidden">
+      <div id="handle"></div>
+      <div id="sheetHead">
+        <div id="sheetTitle"></div>
+        <button id="sheetClose" class="round close" type="button" aria-label="閉じる" data-icon="close"></button>
+      </div>
+      <div id="sheetBody">
+        <div id="place" class="hidden">
+          <div class="actions">
+            <a id="placeNav" class="pill primary"><span data-icon="directions"></span>経路</a>
+            <button id="placeRoute" class="pill" type="button"></button>
+          </div>
+          <div id="placeVisits"></div>
+          <div class="row"><span class="ic" data-icon="pin"></span><span id="placeAddr"></span></div>
+          <div id="placeDistRow" class="row hidden"><span class="ic" data-icon="car"></span><span id="placeDist"></span></div>
+        </div>
+        <div id="missing" class="hidden"></div>
+        <div id="route" class="hidden">
+          <div class="route-opts">
+            <label>出発 <input id="routeStart" type="time" value="09:00"></label>
+            <label>滞在 <input id="routeStay" type="number" min="0" step="5" value="30"> 分/件</label>
+          </div>
+          <div class="actions">
+            <button id="routeCalc" class="pill primary" type="button"><span data-icon="directions"></span>ルートを計算</button>
+            <button id="routeOptimize" class="pill" type="button"><span data-icon="sort"></span>最短順に並べ替え</button>
+            <button id="routeClear" class="pill danger" type="button">クリア</button>
+          </div>
+          <div id="routeMsg"></div>
+          <div id="routeSummary"></div>
+          <div id="routeList"></div>
+          <div id="routeOpen" class="actions"></div>
+          <div id="routeAdd" class="hidden">
+            <div class="head">
+              <h3 id="routeAddTitle"></h3>
+              <button id="routeAddCancel" type="button">キャンセル</button>
+            </div>
+            <input id="routeAddQ" placeholder="患者名で探す" autocomplete="off" enterkeyhint="search">
+            <div id="routeAddList"></div>
+          </div>
+          <div class="note">「Googleマップで開く」は今いる場所から出発し、上の順に経由します（1回に10件まで。それ以上は区切って開きます）</div>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="hidden"></div>
+  </div>
+  <script>
+var ICONS = {
+    search: "M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+    close: "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+    more: "M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+    refresh: "M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
+    logout: "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z",
+    mylocation: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z",
+    directions: "M21.71 11.29l-9-9a1 1 0 0 0-1.42 0l-9 9a1 1 0 0 0 0 1.42l9 9a1 1 0 0 0 1.42 0l9-9a1 1 0 0 0 0-1.42zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z",
+    pin: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z",
+    car: "M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm11 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM5 11l1.5-4.5h11L19 11H5z",
+    route: "M19 15.18V7c0-2.21-1.79-4-4-4s-4 1.79-4 4v10c0 1.1-.9 2-2 2s-2-.9-2-2V8.82A3.001 3.001 0 0 0 5 3a3 3 0 0 0-1 5.82V17c0 2.21 1.79 4 4 4s4-1.79 4-4V7c0-1.1.9-2 2-2s2 .9 2 2v8.18A3.001 3.001 0 0 0 18 21a3 3 0 0 0 1-5.82z",
+    add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+    remove: "M19 13H5v-2h14v2z",
+    sort: "M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z",
+    up: "M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z",
+    down: "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z",
+    open: "M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+};
+function icon(name, size) {
+    size = size || 20;
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+    svg.setAttribute("fill", "currentColor");
+    var path = document.createElementNS(ns, "path");
+    path.setAttribute("d", ICONS[name]);
+    svg.appendChild(path);
+    return svg;
+}
+Array.prototype.forEach.call(document.querySelectorAll("[data-icon]"), function(el) {
+    el.insertBefore(icon(el.getAttribute("data-icon"), el.classList.contains("fab") ? 24 : 20), el.firstChild);
+});
+function $(id) {
+    return document.getElementById(id);
+}
+var API_URL = "https://script.google.com/macros/s/AKfycbzFBDYgC_OaMd1Rd6FtMjNKpkXo_dwQynrGM4BEv2hP_yrWHCchyMn7jI_lIfCLsmo8RA/exec";
+var API_FUNCTIONS = [ "login", "logout", "getMapData", "refreshMap", "computeRoute" ];
+function server() {
+    if (window.google && google.script && google.script.run) return google.script.run;
+    var ok = function() {}, ng = function() {};
+    var runner = {
+        withSuccessHandler: function(f) {
+            ok = f;
+            return runner;
+        },
+        withFailureHandler: function(f) {
+            ng = f;
+            return runner;
+        }
+    };
+    API_FUNCTIONS.forEach(function(fn) {
+        runner[fn] = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var send = function(retry) {
+                fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify({
+                        action: "api",
+                        fn: fn,
+                        args: args
+                    }),
+                    credentials: "omit"
+                }).then(function(r) {
+                    return r.text();
+                }).then(function(text) {
+                    var res;
+                    try {
+                        res = JSON.parse(text);
+                    } catch (e) {
+                        if (retry) {
+                            setTimeout(function() {
+                                send(false);
+                            }, 2e3);
+                            return;
+                        }
+                        throw new Error("サーバーの応答を読めませんでした");
+                    }
+                    if (res && res.apiError) throw new Error(res.apiError);
+                    ok(res);
+                }).catch(function(e) {
+                    ng(e instanceof Error ? e : new Error(String(e)));
+                });
+            };
+            send(fn !== "refreshMap");
+        };
+    });
+    return runner;
+}
+window.addEventListener("error", function(e) {
+    var t = document.getElementById("toast");
+    if (!t) return;
+    t.textContent = "画面のエラー: " + e.message + "（" + e.lineno + "行）";
+    t.classList.remove("hidden");
+});
+var TOKEN_KEY = "visitMapToken";
+var memoryToken = null;
+function getToken() {
+    try {
+        return localStorage.getItem(TOKEN_KEY) || memoryToken;
+    } catch (e) {
+        return memoryToken;
+    }
+}
+function setToken(t) {
+    memoryToken = t;
+    try {
+        localStorage.setItem(TOKEN_KEY, t);
+    } catch (e) {}
+}
+function clearToken() {
+    memoryToken = null;
+    try {
+        localStorage.removeItem(TOKEN_KEY);
+    } catch (e) {}
+}
+function showLogin(message) {
+    $("app").classList.add("hidden");
+    $("login").classList.remove("hidden");
+    $("loginMsg").textContent = message || "";
+}
+function expired() {
+    clearToken();
+    showLogin("ログインの有効期限が切れました");
+}
+function loadData() {
+    var token = getToken();
+    if (!token) {
+        showLogin();
+        return;
+    }
+    server().withSuccessHandler(function(data) {
+        if (!data.ok) {
+            expired();
+            return;
+        }
+        $("login").classList.add("hidden");
+        $("app").classList.remove("hidden");
+        startMap(data);
+    }).withFailureHandler(function(e) {
+        showLogin("読み込みに失敗しました: " + e.message);
+    }).getMapData(token);
+}
+$("login").addEventListener("submit", function(ev) {
+    ev.preventDefault();
+    $("loginMsg").textContent = "確認中…";
+    server().withSuccessHandler(function(res) {
+        if (!res.ok) {
+            $("loginMsg").textContent = res.message;
+            return;
+        }
+        setToken(res.token);
+        $("loginPw").value = "";
+        loadData();
+    }).withFailureHandler(function(e) {
+        $("loginMsg").textContent = "ログインに失敗しました: " + e.message;
+    }).login($("loginId").value, $("loginPw").value);
+});
+$("logout").addEventListener("click", function() {
+    var token = getToken();
+    clearToken();
+    server().withSuccessHandler(function() {
+        location.reload();
+    }).logout(token);
+});
+var map, clinic = null;
+var patients = [];
+var selected = null;
+var routeStops = [];
+var routeResult = null;
+var routeLine = null;
+var here = null, hereDot = null, hereCircle = null, watchId = null, following = false;
+var schedules = [];
+var viewDate = null;
+var allChosen = false;
+var group = null;
+var doctorColors = {};
+var missingOpen = false;
+var routeDate = null;
+var toastTimer = null;
+function toast(text, ms) {
+    var t = $("toast");
+    t.textContent = text;
+    t.classList.remove("hidden");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+        t.classList.add("hidden");
+    }, ms || 3500);
+}
+function startMap(data) {
+    window.__mapData = data;
+    if (window.google && google.maps) {
+        initMap();
+        return;
+    }
+    var s = document.createElement("script");
+    s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(data.mapsKey) + "&language=ja&region=JP&libraries=geometry&callback=initMap&loading=async";
+    s.async = true;
+    s.onerror = function() {
+        toast("Googleマップを読み込めませんでした", 8e3);
+    };
+    document.head.appendChild(s);
+}
+function isWide() {
+    return window.matchMedia("(min-width: 800px)").matches;
+}
+function initMap() {
+    map = new google.maps.Map($("map"), {
+        center: {
+            lat: 34.72,
+            lng: 135.55
+        },
+        zoom: 13,
+        disableDefaultUI: true,
+        zoomControl: isWide(),
+        zoomControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_BOTTOM
+        },
+        gestureHandling: "greedy",
+        clickableIcons: false,
+        mapTypeId: "roadmap"
+    });
+    map.addListener("click", function() {
+        hideSuggest();
+        $("menu").classList.add("hidden");
+        if (selected) closePlace();
+    });
+    map.addListener("dragstart", function() {
+        setFollowing(false);
+    });
+    clinic = window.__mapData.clinic;
+    if (clinic) {
+        new google.maps.Marker({
+            position: {
+                lat: clinic.lat,
+                lng: clinic.lng
+            },
+            map: map,
+            title: clinic.name,
+            zIndex: 1e3,
+            label: {
+                text: "院",
+                color: "#fff",
+                fontWeight: "bold",
+                fontSize: "12px"
+            },
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 12,
+                fillColor: "#188038",
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 2
+            }
+        });
+    }
+    drawPatients(window.__mapData, true);
+}
+function drawPatients(data, fit) {
+    patients.forEach(function(p) {
+        p.marker.setMap(null);
+    });
+    patients = data.patients;
+    $("countChip").textContent = patients.length + "名" + (data.lastRun ? "・" + data.lastRun.replace(/^\d{4}\//, "") + " 更新" : "");
+    if (data.issueCount > 0) {
+        $("issueChip").textContent = "要確認 " + data.issueCount + "件";
+        $("issueChip").title = "地図に出ていない・位置が不確かな患者がいます（「ジオコード要確認」シート）";
+        $("issueChip").classList.remove("hidden");
+    } else {
+        $("issueChip").classList.add("hidden");
+    }
+    var bounds = new google.maps.LatLngBounds;
+    patients.forEach(function(p) {
+        p.marker = new google.maps.Marker({
+            position: {
+                lat: p.lat,
+                lng: p.lng
+            },
+            map: map,
+            title: p.name
+        });
+        p.marker.addListener("click", function() {
+            openPlace(p);
+        });
+        bounds.extend(p.marker.getPosition());
+    });
+    if (fit && patients.length) map.fitBounds(bounds, isWide() ? safePadding() : 40);
+    setupSchedules(data.schedules || []);
+    routeStops = routeStops.map(function(old) {
+        return patients.filter(function(p) {
+            return sameStop(p, old);
+        })[0] || null;
+    }).filter(function(p) {
+        return p;
+    });
+    if (selected) selected = patients.filter(function(p) {
+        return sameStop(p, selected);
+    })[0] || null;
+    routeChanged();
+}
+function sameStop(a, b) {
+    return a.name === b.name && a.lat === b.lat && a.lng === b.lng;
+}
+var PALETTE = [ "#1a73e8", "#d93025", "#188038", "#9334e6", "#e37400", "#00897b", "#c2185b", "#795548", "#5f6368" ];
+var PIN_PATH = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z";
+var SQUARE_PATH = "M4 4h16v16H4z";
+var WEEK = "日月火水木金土";
+function shortDoctor(name) {
+    return String(name).split(/[\s　]+/)[0] + "DR";
+}
+function todayStr() {
+    var d = new Date;
+    return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+}
+function dayLabel(date) {
+    if (!date) return "";
+    var p = date.split("-");
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    var md = Number(p[1]) + "/" + Number(p[2]) + "(" + WEEK[d.getDay()] + ")";
+    var diff = Math.round((d - new Date(todayStr().replace(/-/g, "/"))) / 864e5);
+    return (diff === 0 ? "今日 " : diff === 1 ? "明日 " : "") + md;
+}
+function setupSchedules(list) {
+    schedules = list;
+    var doctors = {};
+    patients.forEach(function(p) {
+        p.visits = {};
+    });
+    schedules.forEach(function(day) {
+        day.visits.forEach(function(v) {
+            if (typeof v.patient !== "number" || !patients[v.patient]) v.patient = null;
+            if (typeof v.start !== "number") v.start = null;
+            doctors[v.doctor] = true;
+            if (v.patient !== null) {
+                var p = patients[v.patient];
+                (p.visits[day.date] = p.visits[day.date] || []).push(v);
+            }
+        });
+    });
+    Object.keys(doctors).sort().forEach(function(d, i) {
+        if (!doctorColors[d]) doctorColors[d] = PALETTE[Object.keys(doctorColors).length % PALETTE.length];
+    });
+    var dates = schedules.map(function(d) {
+        return d.date;
+    });
+    if (allChosen) {
+        viewDate = null;
+    } else if (!viewDate || dates.indexOf(viewDate) < 0) {
+        viewDate = dates.indexOf(todayStr()) >= 0 ? todayStr() : dates[0] || null;
+        group = null;
+    }
+    applyView();
+}
+function currentDay() {
+    return schedules.filter(function(d) {
+        return d.date === viewDate;
+    })[0] || null;
+}
+function groupKey(v) {
+    return v.doctor + "|" + v.half;
+}
+function visitShown(v) {
+    return !group || groupKey(v) === group;
+}
+function applyView() {
+    var day = currentDay();
+    patients.forEach(function(p) {
+        if (!day) {
+            p.marker.setIcon(null);
+            p.marker.setZIndex(null);
+            p.marker.setVisible(true);
+            return;
+        }
+        var all = p.visits[day.date] || [];
+        var shown = all.filter(visitShown);
+        if (shown.length) {
+            var v = shown[0];
+            p.marker.setIcon(v.half === "am" ? {
+                path: PIN_PATH,
+                fillColor: doctorColors[v.doctor],
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 1.5,
+                scale: 1.7,
+                anchor: new google.maps.Point(12, 22),
+                labelOrigin: new google.maps.Point(12, 9)
+            } : {
+                path: SQUARE_PATH,
+                fillColor: doctorColors[v.doctor],
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 2,
+                scale: 1.1,
+                anchor: new google.maps.Point(12, 12),
+                labelOrigin: new google.maps.Point(12, 12)
+            });
+            p.marker.setZIndex(500);
+            p.marker.setVisible(true);
+        } else if (all.length) {
+            var o = all[0];
+            p.marker.setIcon(o.half === "am" ? {
+                path: PIN_PATH,
+                fillColor: doctorColors[o.doctor],
+                fillOpacity: .3,
+                strokeColor: "#fff",
+                strokeWeight: 1,
+                scale: 1.3,
+                anchor: new google.maps.Point(12, 22),
+                labelOrigin: new google.maps.Point(12, 9)
+            } : {
+                path: SQUARE_PATH,
+                fillColor: doctorColors[o.doctor],
+                fillOpacity: .3,
+                strokeColor: "#fff",
+                strokeWeight: 1,
+                scale: .85,
+                anchor: new google.maps.Point(12, 12),
+                labelOrigin: new google.maps.Point(12, 12)
+            });
+            p.marker.setZIndex(100);
+            p.marker.setVisible(true);
+        } else {
+            p.marker.setIcon({
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 4,
+                fillColor: "#9aa0a6",
+                fillOpacity: .9,
+                strokeColor: "#fff",
+                strokeWeight: 1
+            });
+            p.marker.setZIndex(1);
+            p.marker.setVisible(true);
+        }
+    });
+    renderScheduleChips();
+    if (selected) renderPlaceVisits(selected);
+    if (missingOpen) renderMissing();
+}
+function chip(label, cls, onClick, dotColor, square) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip " + (cls || "");
+    if (dotColor) {
+        var dot = document.createElement("span");
+        dot.className = "dot" + (square ? " sq" : "");
+        dot.style.background = dotColor;
+        b.appendChild(dot);
+    }
+    b.appendChild(document.createTextNode(label));
+    b.addEventListener("click", onClick);
+    return b;
+}
+function renderScheduleChips() {
+    var dayRow = $("dayChips"), filterRow = $("filterChips");
+    dayRow.innerHTML = "";
+    filterRow.innerHTML = "";
+    dayRow.classList.toggle("hidden", schedules.length === 0);
+    filterRow.classList.toggle("hidden", !currentDay());
+    $("missingChip").classList.add("hidden");
+    if (!schedules.length) {
+        placeFabs();
+        return;
+    }
+    dayRow.appendChild(chip("全患者", viewDate ? "" : "sel", function() {
+        allChosen = true;
+        viewDate = null;
+        group = null;
+        missingOpen = false;
+        if (routeDate) {
+            routeStops = [];
+            routeDate = null;
+            routeChanged();
+        }
+        applyView();
+        showSheet();
+    }));
+    schedules.forEach(function(d) {
+        dayRow.appendChild(chip(dayLabel(d.date) + "の訪問", viewDate === d.date ? "sel" : "", function() {
+            allChosen = false;
+            viewDate = d.date;
+            group = null;
+            missingOpen = false;
+            if (routeDate) {
+                routeStops = [];
+                routeDate = null;
+                routeChanged();
+            }
+            applyView();
+            showSheet();
+        }));
+    });
+    var day = currentDay();
+    if (!day) {
+        placeFabs();
+        return;
+    }
+    var groups = {};
+    day.visits.forEach(function(v) {
+        var k = groupKey(v);
+        (groups[k] = groups[k] || {
+            doctor: v.doctor,
+            half: v.half,
+            n: 0
+        }).n++;
+    });
+    Object.keys(groups).sort(function(a, b) {
+        var ga = groups[a], gb = groups[b];
+        return ga.doctor === gb.doctor ? ga.half === "am" ? -1 : 1 : ga.doctor < gb.doctor ? -1 : 1;
+    }).forEach(function(k) {
+        var g = groups[k];
+        var label = String(g.doctor).split(/[\s　]+/)[0] + " " + (g.half === "am" ? "午前" : "午後") + " " + g.n;
+        filterRow.appendChild(chip(label, group === k ? "sel" : group ? "off" : "", function() {
+            group = group === k ? null : k;
+            applyView();
+            if (group) {
+                routeFromView();
+            } else if (routeDate) {
+                routeStops = [];
+                routeDate = null;
+                routeChanged();
+            }
+        }, doctorColors[g.doctor], g.half === "pm"));
+    });
+    var missing = day.visits.filter(function(v) {
+        return v.patient === null;
+    });
+    if (missing.length) {
+        $("missingChip").textContent = "地図にない予定 " + missing.length + "件";
+        $("missingChip").classList.remove("hidden");
+    }
+    placeFabs();
+}
+$("missingChip").addEventListener("click", function() {
+    selected = null;
+    missingOpen = true;
+    renderMissing();
+    $("sheet").classList.remove("collapsed");
+    showSheet();
+});
+function visitRow(v, dateLabelText) {
+    var row = document.createElement("div");
+    row.className = "visit";
+    var dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = doctorColors[v.doctor] || "#9aa0a6";
+    if (v.half === "pm") dot.style.borderRadius = "2px";
+    row.appendChild(dot);
+    var body = document.createElement("div");
+    var t = document.createElement("div");
+    t.textContent = (dateLabelText ? dateLabelText + "　" : "") + (v.half === "am" ? "午前 " : "午後 ") + v.timeRange + "　" + shortDoctor(v.doctor);
+    var sub = document.createElement("div");
+    sub.className = "sub";
+    sub.textContent = v.purpose;
+    body.appendChild(t);
+    body.appendChild(sub);
+    row.appendChild(body);
+    return row;
+}
+function renderPlaceVisits(p) {
+    var box = $("placeVisits");
+    box.innerHTML = "";
+    schedules.forEach(function(d) {
+        if (viewDate && d.date !== viewDate) return;
+        (p.visits && p.visits[d.date] || []).forEach(function(v) {
+            box.appendChild(visitRow(v, dayLabel(d.date)));
+        });
+    });
+}
+function renderMissing() {
+    var box = $("missing");
+    box.innerHTML = "";
+    var day = currentDay();
+    if (!day) return;
+    day.visits.filter(function(v) {
+        return v.patient === null;
+    }).forEach(function(v) {
+        var row = visitRow(v, "");
+        var name = document.createElement("div");
+        name.style.fontWeight = "500";
+        name.textContent = v.name;
+        var reason = document.createElement("div");
+        reason.className = "sub";
+        reason.style.color = "#d93025";
+        reason.textContent = v.reason;
+        row.lastChild.insertBefore(name, row.lastChild.firstChild);
+        row.lastChild.appendChild(reason);
+        box.appendChild(row);
+    });
+}
+var DEPART_AM = "09:15";
+var DEPART_PM = "13:30";
+function routeFromView() {
+    var day = currentDay();
+    if (!day) return;
+    var list = day.visits.filter(function(v) {
+        return v.patient !== null && visitShown(v);
+    }).sort(function(a, b) {
+        return (a.start || 0) - (b.start || 0);
+    });
+    var seen = {};
+    var stops = [];
+    list.forEach(function(v) {
+        if (!seen[v.patient]) {
+            seen[v.patient] = true;
+            stops.push(patients[v.patient]);
+        }
+    });
+    if (!stops.length) {
+        toast("表示中の訪問がありません");
+        return;
+    }
+    if (stops.length > 25) {
+        toast("ルートに入れられるのは25件までです。医師や午前・午後で絞り込んでください", 5e3);
+        return;
+    }
+    routeStops = stops;
+    routeDate = day.date;
+    $("routeStart").value = list[0].half === "pm" ? DEPART_PM : DEPART_AM;
+    selected = null;
+    missingOpen = false;
+    routeChanged();
+    $("sheet").classList.remove("collapsed");
+    showSheet();
+    calcRoute(false);
+}
+function showSheet() {
+    var sheet = $("sheet");
+    if (selected) missingOpen = false;
+    $("place").classList.toggle("hidden", !selected);
+    $("missing").classList.toggle("hidden", !missingOpen);
+    $("route").classList.toggle("hidden", !!selected || missingOpen || routeStops.length === 0);
+    sheet.classList.toggle("hidden", !selected && !missingOpen && routeStops.length === 0);
+    var title = $("sheetTitle");
+    title.innerHTML = "";
+    var h = document.createElement("h2");
+    var sub = document.createElement("div");
+    sub.className = "s";
+    if (selected) {
+        h.textContent = selected.name;
+        var i = routeIndex(selected);
+        sub.textContent = i >= 0 ? "ルートの " + (i + 1) + " 番目" : "訪問患者";
+    } else if (missingOpen) {
+        h.textContent = "地図にない予定";
+        sub.textContent = dayLabel(viewDate) + "の予定のうち、地図の患者と結びつかなかったもの";
+    } else if (routeStops.length) {
+        h.textContent = "ルート（" + routeStops.length + "件）";
+        sub.textContent = routeResult ? "車・渋滞予測込み" : "クリニック発・クリニック着";
+    }
+    title.appendChild(h);
+    title.appendChild(sub);
+    placeFabs();
+}
+function placeFabs() {
+    if (isWide()) {
+        $("fabs").style.bottom = "";
+        return;
+    }
+    var sheet = $("sheet");
+    var h = sheet.classList.contains("hidden") ? 0 : sheet.offsetHeight;
+    $("fabs").style.bottom = h + 16 + "px";
+}
+window.addEventListener("resize", placeFabs);
+$("sheetClose").addEventListener("click", function() {
+    if (selected) {
+        closePlace();
+        return;
+    }
+    if (missingOpen) {
+        missingOpen = false;
+        showSheet();
+        return;
+    }
+    $("sheet").classList.add("collapsed");
+    placeFabs();
+});
+(function() {
+    var startY = null;
+    var handle = $("handle");
+    handle.addEventListener("pointerdown", function(e) {
+        startY = e.clientY;
+    });
+    handle.addEventListener("pointerup", function(e) {
+        if (startY === null) return;
+        var dy = e.clientY - startY;
+        var sheet = $("sheet");
+        if (dy > 20) sheet.classList.add("collapsed"); else if (dy < -20) sheet.classList.remove("collapsed"); else sheet.classList.toggle("collapsed");
+        startY = null;
+        placeFabs();
+    });
+    $("sheetHead").addEventListener("click", function(e) {
+        if (e.target.closest("button")) return;
+        $("sheet").classList.remove("collapsed");
+        placeFabs();
+    });
+})();
+function openPlace(p) {
+    selected = p;
+    hideSuggest();
+    $("sheet").classList.remove("collapsed");
+    $("placeAddr").textContent = p.address;
+    renderPlaceVisits(p);
+    $("placeNav").href = navUrl(p);
+    renderPlaceRouteButton();
+    updateDistance();
+    showSheet();
+    map.panTo(p.marker.getPosition());
+    if (map.getZoom() < 15) map.setZoom(15);
+}
+function closePlace() {
+    selected = null;
+    showSheet();
+}
+function renderPlaceRouteButton() {
+    var btn = $("placeRoute");
+    btn.innerHTML = "";
+    var inRoute = routeIndex(selected) >= 0;
+    btn.appendChild(icon(inRoute ? "remove" : "add"));
+    btn.appendChild(document.createTextNode(inRoute ? "ルートから外す" : "ルートに追加"));
+    btn.classList.toggle("danger", inRoute);
+}
+$("placeRoute").addEventListener("click", function() {
+    if (!selected) return;
+    var i = routeIndex(selected);
+    if (i >= 0) {
+        routeStops.splice(i, 1);
+        toast(selected.name + " をルートから外しました");
+    } else {
+        addToRoute(selected);
+        renderPlaceRouteButton();
+        showSheet();
+        return;
+    }
+    editRoute();
+    renderPlaceRouteButton();
+    showSheet();
+});
+function navUrl(p) {
+    return "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + p.lat + "," + p.lng;
+}
+function updateDistance() {
+    if (!selected || !here || !google.maps.geometry) {
+        $("placeDistRow").classList.add("hidden");
+        return;
+    }
+    var m = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(here.lat, here.lng), selected.marker.getPosition());
+    $("placeDist").textContent = "現在地から直線 " + (m < 1e3 ? Math.round(m) + " m" : (m / 1e3).toFixed(1) + " km");
+    $("placeDistRow").classList.remove("hidden");
+}
+function toKatakana(q) {
+    var s = String(q).normalize("NFKC").replace(/[\s　]+/g, "").replace(/[ぁ-ゖ]/g, function(c) {
+        return String.fromCharCode(c.charCodeAt(0) + 96);
+    });
+    return /^[ァ-ヶー]+$/.test(s) ? s : "";
+}
+function hideSuggest() {
+    $("suggest").classList.add("hidden");
+}
+function renderSuggest() {
+    var q = $("search").value.trim().replace(/\s+/g, "");
+    $("searchClear").classList.toggle("hidden", !$("search").value);
+    var box = $("suggest");
+    box.innerHTML = "";
+    if (!q) {
+        hideSuggest();
+        return;
+    }
+    var qk = toKatakana(q);
+    var hits = patients.filter(function(p) {
+        return p.name.replace(/\s+/g, "").indexOf(q) >= 0 || p.address.replace(/\s+/g, "").indexOf(q) >= 0 || p.kana && qk && p.kana.indexOf(qk) >= 0;
+    }).slice(0, 20);
+    if (!hits.length) {
+        var none = document.createElement("div");
+        none.className = "sug none";
+        none.textContent = "見つかりません";
+        box.appendChild(none);
+    }
+    hits.forEach(function(p) {
+        var row = document.createElement("div");
+        row.className = "sug";
+        var pin = document.createElement("div");
+        pin.className = "pin";
+        pin.appendChild(icon("pin", 18));
+        var text = document.createElement("div");
+        var t = document.createElement("div");
+        t.className = "t";
+        t.textContent = p.name;
+        var s = document.createElement("div");
+        s.className = "s";
+        s.textContent = p.address;
+        text.appendChild(t);
+        text.appendChild(s);
+        row.appendChild(pin);
+        row.appendChild(text);
+        row.addEventListener("click", function() {
+            $("search").value = p.name;
+            $("search").blur();
+            openPlace(p);
+        });
+        box.appendChild(row);
+    });
+    box.classList.remove("hidden");
+}
+$("search").addEventListener("input", renderSuggest);
+$("search").addEventListener("focus", function() {
+    $("menu").classList.add("hidden");
+    renderSuggest();
+});
+$("search").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+        var first = $("suggest").querySelector(".sug:not(.none)");
+        if (first) first.click();
+    }
+});
+$("searchClear").addEventListener("click", function() {
+    $("search").value = "";
+    renderSuggest();
+    $("search").focus();
+});
+$("menuBtn").addEventListener("click", function(ev) {
+    ev.stopPropagation();
+    hideSuggest();
+    $("menu").classList.toggle("hidden");
+});
+document.addEventListener("click", function(e) {
+    if (!e.target.closest("#menu")) $("menu").classList.add("hidden");
+});
+$("refresh").addEventListener("click", function() {
+    $("menu").classList.add("hidden");
+    toast("住所から位置を取り直しています…（1分ほどかかることがあります）", 6e4);
+    server().withSuccessHandler(function(data) {
+        if (data.ok) {
+            window.__mapData = data;
+            drawPatients(data, false);
+            toast("地図を更新しました");
+            return;
+        }
+        if (data.busy) {
+            toast(data.message);
+            return;
+        }
+        expired();
+    }).withFailureHandler(function(e) {
+        toast("更新に失敗しました: " + e.message, 6e3);
+    }).refreshMap(getToken());
+});
+function setFollowing(on) {
+    following = on;
+    $("locate").classList.toggle("active", on);
+}
+function showHere(pos) {
+    here = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+    };
+    if (!hereDot) {
+        hereCircle = new google.maps.Circle({
+            map: map,
+            center: here,
+            radius: pos.coords.accuracy,
+            strokeWeight: 0,
+            fillColor: "#1a73e8",
+            fillOpacity: .15,
+            clickable: false
+        });
+        hereDot = new google.maps.Marker({
+            map: map,
+            position: here,
+            zIndex: 2e3,
+            title: "現在地",
+            clickable: false,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#1a73e8",
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 3
+            }
+        });
+    } else {
+        hereDot.setPosition(here);
+        hereCircle.setCenter(here);
+        hereCircle.setRadius(pos.coords.accuracy);
+    }
+    if (following) map.panTo(here);
+    updateDistance();
+}
+function geoError(err) {
+    setFollowing(false);
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+    if (err.code === 1) {
+        toast("位置情報の利用が許可されていません。端末やブラウザの設定で、このページの位置情報を許可してください", 7e3);
+    } else {
+        toast("現在地を取得できませんでした（" + err.message + "）", 5e3);
+    }
+}
+$("locate").addEventListener("click", function() {
+    if (!navigator.geolocation) {
+        toast("この端末では現在地を取得できません");
+        return;
+    }
+    setFollowing(true);
+    if (here) {
+        map.panTo(here);
+        if (map.getZoom() < 15) map.setZoom(16);
+    } else {
+        toast("現在地を取得しています…", 2e3);
+    }
+    if (watchId === null) {
+        var first = true;
+        watchId = navigator.geolocation.watchPosition(function(pos) {
+            showHere(pos);
+            if (first) {
+                first = false;
+                map.panTo(here);
+                map.setZoom(16);
+            }
+        }, geoError, {
+            enableHighAccuracy: true,
+            timeout: 15e3,
+            maximumAge: 1e4
+        });
+    }
+});
+function routeIndex(p) {
+    if (!p) return -1;
+    for (var i = 0; i < routeStops.length; i++) if (sameStop(routeStops[i], p)) return i;
+    return -1;
+}
+function routeChanged() {
+    routeResult = null;
+    if (!routeStops.length) {
+        autoCalc = false;
+        clearTimeout(recalcTimer);
+        recalcTimer = null;
+    }
+    renderRoute();
+}
+var autoCalc = false;
+var recalcTimer = null;
+var RECALC_DELAY_MS = 1e3;
+function editRoute() {
+    routeChanged();
+    if (!autoCalc || !routeStops.length) return;
+    clearTimeout(recalcTimer);
+    recalcTimer = setTimeout(function() {
+        recalcTimer = null;
+        calcRoute(false, true);
+    }, RECALC_DELAY_MS);
+}
+function fmtTime(ms) {
+    var d = new Date(ms);
+    return d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2);
+}
+function fmtMin(sec) {
+    var m = Math.round(sec / 60);
+    return m >= 60 ? Math.floor(m / 60) + "時間" + m % 60 + "分" : m + "分";
+}
+function departureMs() {
+    var v = $("routeStart").value || "09:00";
+    var d = new Date;
+    if (routeDate) {
+        var p = routeDate.split("-");
+        d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+    d.setHours(Number(v.split(":")[0]), Number(v.split(":")[1]), 0, 0);
+    return d.getTime();
+}
+function miniButton(iconName, label, onClick, disabled) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "mini";
+    b.setAttribute("aria-label", label);
+    b.title = label;
+    b.disabled = !!disabled;
+    b.appendChild(icon(iconName));
+    b.addEventListener("click", function(e) {
+        e.stopPropagation();
+        onClick();
+    });
+    return b;
+}
+function stopRow(numText, isClinic, name, timeText, subText, target, controls) {
+    var row = document.createElement("div");
+    row.className = "stop";
+    var num = document.createElement("div");
+    num.className = "num" + (isClinic ? " clinic" : "");
+    num.textContent = numText;
+    row.appendChild(num);
+    var body = document.createElement("div");
+    body.className = "body";
+    var t = document.createElement("div");
+    t.className = "name";
+    if (timeText) {
+        var tm = document.createElement("span");
+        tm.className = "time";
+        tm.textContent = timeText;
+        t.appendChild(tm);
+    }
+    t.appendChild(document.createTextNode(name));
+    body.appendChild(t);
+    if (subText) {
+        var sub = document.createElement("div");
+        sub.className = "sub";
+        sub.textContent = subText;
+        body.appendChild(sub);
+    }
+    row.appendChild(body);
+    var ctl = document.createElement("div");
+    ctl.className = "ctl";
+    row.appendChild(ctl);
+    (controls || []).forEach(function(c) {
+        ctl.appendChild(c);
+    });
+    if (target) {
+        var a = document.createElement("a");
+        a.className = "mini";
+        a.href = navUrl(target);
+        a.title = "経路";
+        a.appendChild(icon("directions"));
+        ctl.appendChild(a);
+    }
+    return row;
+}
+var PREP_SEC = 5 * 60;
+function renderRoute() {
+    patients.forEach(function(p) {
+        if (p.marker) p.marker.setLabel(null);
+    });
+    routeStops.forEach(function(p, i) {
+        if (p.marker) p.marker.setLabel({
+            text: String(i + 1),
+            color: "#fff",
+            fontWeight: "bold"
+        });
+    });
+    if (routeLine) {
+        routeLine.setMap(null);
+        routeLine = null;
+    }
+    $("routeChip").classList.toggle("hidden", routeStops.length === 0);
+    $("routeChipText").textContent = "ルート " + routeStops.length + "件";
+    $("routeMsg").textContent = "";
+    var typingAdd = document.activeElement === $("routeAddQ");
+    var list = $("routeList");
+    $("route").appendChild($("routeAdd"));
+    list.innerHTML = "";
+    var r = routeResult;
+    var t = r ? r.departureMs : null;
+    var stay = Math.max(Number($("routeStay").value) || 0, 0) * 60 * 1e3;
+    var totalSec = 0, totalM = 0;
+    list.appendChild(stopRow("院", true, "クリニック出発", r ? fmtTime(t) : "", "", null));
+    list.appendChild(addSlot(0));
+    if (addAt === 0) list.appendChild(addPanel());
+    routeStops.forEach(function(p, i) {
+        var timeText = "", subText = p.address;
+        if (r) {
+            var leg = r.legs[i];
+            var sec = leg.seconds + PREP_SEC;
+            totalSec += sec;
+            totalM += leg.meters;
+            t += sec * 1e3;
+            timeText = fmtTime(t) + "着";
+            subText = "移動 " + fmtMin(sec) + "・" + (leg.meters / 1e3).toFixed(1) + " km　" + fmtTime(t + stay) + " 発";
+            t += stay;
+        }
+        list.appendChild(stopRow(String(i + 1), false, p.name, timeText, subText, p, [ miniButton("up", "上へ", function() {
+            moveStop(i, -1);
+        }, i === 0), miniButton("down", "下へ", function() {
+            moveStop(i, 1);
+        }, i === routeStops.length - 1), miniButton("close", "外す", function() {
+            routeStops.splice(i, 1);
+            addAt = null;
+            editRoute();
+        }) ]));
+        list.appendChild(addSlot(i + 1));
+        if (addAt === i + 1) list.appendChild(addPanel());
+    });
+    var summary = $("routeSummary");
+    summary.innerHTML = "";
+    if (r) {
+        var last = r.legs[r.legs.length - 1];
+        var lastSec = last.seconds + PREP_SEC;
+        totalSec += lastSec;
+        totalM += last.meters;
+        t += lastSec * 1e3;
+        list.appendChild(stopRow("院", true, "クリニック帰着", fmtTime(t) + "着", "移動 " + fmtMin(lastSec) + "・" + (last.meters / 1e3).toFixed(1) + " km", clinic));
+        var depDate = new Date(r.departureMs);
+        var depStr = depDate.getFullYear() + "-" + ("0" + (depDate.getMonth() + 1)).slice(-2) + "-" + ("0" + depDate.getDate()).slice(-2);
+        var dayText = depStr !== todayStr() ? "（" + dayLabel(depStr) + "）" : "";
+        var b = document.createElement("b");
+        b.textContent = fmtTime(r.departureMs) + dayText + " → " + fmtTime(t);
+        summary.appendChild(b);
+        summary.appendChild(document.createTextNode("　移動 計" + fmtMin(totalSec) + "（" + (totalM / 1e3).toFixed(1) + " km）"));
+        var prepNote = document.createElement("div");
+        prepNote.className = "note";
+        prepNote.textContent = "移動時間はGoogleの予測に準備時間" + PREP_SEC / 60 + "分を足しています";
+        summary.appendChild(prepNote);
+        if (r.trafficShifted) {
+            var note = document.createElement("div");
+            note.className = "note";
+            note.textContent = "過ぎた時刻のため、同じ曜日・時刻の渋滞予測で計算しています";
+            summary.appendChild(note);
+        }
+        if (r.polyline && google.maps.geometry) {
+            routeLine = new google.maps.Polyline({
+                path: google.maps.geometry.encoding.decodePath(r.polyline),
+                map: map,
+                strokeColor: "#1a73e8",
+                strokeOpacity: .9,
+                strokeWeight: 6
+            });
+        }
+    } else {
+        list.appendChild(stopRow("院", true, "クリニック帰着", "", "", null));
+    }
+    if (addAt === null || addAt > routeStops.length) {
+        addAt = null;
+        $("routeAdd").classList.add("hidden");
+    }
+    if (typingAdd && addAt !== null) $("routeAddQ").focus();
+    renderOpenLinks();
+    renderAddList();
+    showSheet();
+}
+function routeDay() {
+    return schedules.filter(function(d) {
+        return d.date === (routeDate || viewDate);
+    })[0] || null;
+}
+function firstVisit(p, date) {
+    var vs = (p.visits && p.visits[date] || []).slice().sort(function(a, b) {
+        return (a.start || 0) - (b.start || 0);
+    });
+    return vs[0] || null;
+}
+var addAt = null;
+function addSlot(at) {
+    var slot = document.createElement("div");
+    slot.className = "slot";
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = addAt === at ? "on" : "";
+    b.setAttribute("aria-label", "ここに患者を追加");
+    b.title = "ここに患者を追加";
+    b.appendChild(icon("add"));
+    b.addEventListener("click", function(e) {
+        e.stopPropagation();
+        addAt = addAt === at ? null : at;
+        $("routeAddQ").value = "";
+        renderRoute();
+        if (addAt !== null) {
+            $("sheet").classList.remove("collapsed");
+            $("routeAddQ").focus();
+            $("routeAdd").scrollIntoView({
+                block: "nearest"
+            });
+        }
+    });
+    slot.appendChild(b);
+    return slot;
+}
+function addPanel() {
+    var el = $("routeAdd");
+    el.classList.remove("hidden");
+    $("routeAddTitle").textContent = (addAt === 0 ? "クリニックの次" : addAt + " 番目の次") + "に追加";
+    return el;
+}
+function renderAddList() {
+    var box = $("routeAddList");
+    box.innerHTML = "";
+    var q = $("routeAddQ").value.trim().replace(/\s+/g, "");
+    var qk = toKatakana(q);
+    var day = routeDay();
+    var cands;
+    if (q) {
+        cands = patients.filter(function(p) {
+            return routeIndex(p) < 0 && (p.name.replace(/\s+/g, "").indexOf(q) >= 0 || p.kana && qk && p.kana.indexOf(qk) >= 0);
+        }).slice(0, 20);
+    } else {
+        cands = [];
+    }
+    cands.forEach(function(p) {
+        var v = day ? firstVisit(p, day.date) : null;
+        var row = document.createElement("div");
+        row.className = "cand";
+        var dot = document.createElement("span");
+        dot.className = "dot";
+        if (v) {
+            dot.style.background = doctorColors[v.doctor] || "#9aa0a6";
+            if (v.half === "pm") dot.style.borderRadius = "2px";
+        }
+        var body = document.createElement("div");
+        body.className = "body";
+        var t = document.createElement("div");
+        t.className = "t";
+        t.textContent = (v ? v.timeRange + "　" : "") + p.name;
+        var sub = document.createElement("div");
+        sub.className = "s";
+        sub.textContent = v ? shortDoctor(v.doctor) + "　" + p.address : p.address;
+        body.appendChild(t);
+        body.appendChild(sub);
+        var plus = document.createElement("span");
+        plus.className = "plus";
+        plus.appendChild(icon("add"));
+        row.appendChild(dot);
+        row.appendChild(body);
+        row.appendChild(plus);
+        row.addEventListener("click", function() {
+            addToRoute(p, addAt);
+        });
+        box.appendChild(row);
+    });
+    if (q && !cands.length) {
+        var none = document.createElement("div");
+        none.className = "note";
+        none.textContent = "見つかりません";
+        box.appendChild(none);
+    }
+}
+function addToRoute(p, at) {
+    if (routeIndex(p) >= 0) return;
+    if (routeStops.length >= 25) {
+        toast("ルートに入れられるのは25件までです");
+        return;
+    }
+    addAt = null;
+    var v = routeDate ? firstVisit(p, routeDate) : null;
+    if (at === null || at === undefined) at = routeStops.length; else v = null;
+    if (v && v.start !== null) {
+        for (var i = 0; i < routeStops.length; i++) {
+            var w = firstVisit(routeStops[i], routeDate);
+            if (w && w.start !== null && w.start > v.start) {
+                at = i;
+                break;
+            }
+        }
+    }
+    routeStops.splice(at, 0, p);
+    $("routeAddQ").value = "";
+    toast(p.name + " を " + (at + 1) + " 番目に追加しました");
+    editRoute();
+}
+$("routeAddQ").addEventListener("input", renderAddList);
+$("routeAddCancel").addEventListener("click", function() {
+    addAt = null;
+    $("routeAddQ").value = "";
+    $("routeAddQ").blur();
+    renderRoute();
+});
+function moveStop(i, d) {
+    var p = routeStops.splice(i, 1)[0];
+    routeStops.splice(i + d, 0, p);
+    editRoute();
+}
+var STOPS_PER_LINK = 10;
+function renderOpenLinks() {
+    var box = $("routeOpen");
+    box.innerHTML = "";
+    var points = routeStops.map(function(p, i) {
+        return {
+            q: p.approx || !p.navAddress ? p.lat + "," + p.lng : p.navAddress,
+            label: String(i + 1)
+        };
+    });
+    if (clinic) points.push({
+        q: clinic.address || clinic.lat + "," + clinic.lng,
+        label: "院"
+    });
+    for (var start = 0; start < points.length; start += STOPS_PER_LINK) {
+        var chunk = points.slice(start, start + STOPS_PER_LINK);
+        var dest = chunk[chunk.length - 1];
+        var via = chunk.slice(0, -1);
+        var url = "https://www.google.com/maps/dir/?api=1&travelmode=driving" + "&destination=" + encodeURIComponent(dest.q);
+        if (via.length) {
+            url += "&waypoints=" + encodeURIComponent(via.map(function(w) {
+                return w.q.replace(/\|/g, " ");
+            }).join("|"));
+        }
+        var a = document.createElement("a");
+        a.className = "pill green";
+        a.href = url;
+        a.appendChild(icon("open", 18));
+        a.appendChild(document.createTextNode(points.length <= STOPS_PER_LINK ? "Googleマップでまとめて開く" : "Googleマップで開く（" + (via.length ? chunk[0].label : "") + "→" + dest.label + "）"));
+        box.appendChild(a);
+    }
+}
+function safePadding() {
+    var w = $("map").offsetWidth, h = $("map").offsetHeight;
+    if (isWide()) return {
+        left: Math.min(420, w * .5),
+        top: 80,
+        right: 40,
+        bottom: 40
+    };
+    var top = Math.min($("top").offsetHeight + 20, h * .3);
+    var bottom = Math.min($("sheet").classList.contains("hidden") ? 20 : $("sheet").offsetHeight + 20, h * .4);
+    return {
+        top: top,
+        bottom: bottom,
+        left: 30,
+        right: 30
+    };
+}
+var routeCache = {};
+var routeSeq = 0;
+function calcRoute(optimize, keepView) {
+    clearTimeout(recalcTimer);
+    recalcTimer = null;
+    if (!routeStops.length) return;
+    autoCalc = true;
+    $("routeMsg").textContent = "";
+    var stops = routeStops.map(function(p) {
+        return {
+            lat: p.lat,
+            lng: p.lng
+        };
+    });
+    var dep = departureMs();
+    var key = [ dep, optimize ? 1 : 0 ].concat(stops.map(function(st) {
+        return st.lat + "," + st.lng;
+    })).join("|");
+    var seq = ++routeSeq;
+    var onResult = function(res) {
+        try {
+            showRouteResult(res);
+        } catch (e) {
+            $("routeMsg").textContent = "ルートの表示に失敗しました: " + e.message;
+            $("toast").classList.add("hidden");
+        }
+    };
+    var showRouteResult = function(res) {
+        if (seq !== routeSeq) return;
+        $("toast").classList.add("hidden");
+        if (res.expired) {
+            expired();
+            return;
+        }
+        if (!res.ok) {
+            $("routeMsg").textContent = res.message;
+            return;
+        }
+        routeCache[key] = res;
+        if (optimize) routeStops = res.order.map(function(k) {
+            return routeStops[k];
+        });
+        routeResult = res;
+        renderRoute();
+        if (routeLine && !keepView) {
+            var bounds = new google.maps.LatLngBounds;
+            routeLine.getPath().forEach(function(ll) {
+                bounds.extend(ll);
+            });
+            map.fitBounds(bounds, safePadding());
+        }
+    };
+    if (routeCache[key]) {
+        onResult(routeCache[key]);
+        return;
+    }
+    toast("ルートを計算中…", 2e4);
+    server().withSuccessHandler(onResult).withFailureHandler(function(e) {
+        if (seq !== routeSeq) return;
+        $("toast").classList.add("hidden");
+        $("routeMsg").textContent = "計算に失敗しました: " + e.message;
+    }).computeRoute(getToken(), stops, dep, optimize);
+}
+$("routeCalc").addEventListener("click", function() {
+    calcRoute(false);
+});
+$("routeOptimize").addEventListener("click", function() {
+    calcRoute(true);
+});
+$("routeClear").addEventListener("click", function() {
+    routeStops = [];
+    routeDate = null;
+    routeChanged();
+});
+$("routeStart").addEventListener("change", editRoute);
+$("routeStay").addEventListener("change", renderRoute);
+$("routeChip").addEventListener("click", function() {
+    selected = null;
+    missingOpen = false;
+    $("sheet").classList.remove("collapsed");
+    showSheet();
+});
+loadData();
+</script>
+</body>
+</html>
