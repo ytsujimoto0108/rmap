@@ -513,6 +513,10 @@ function drawPatients(data, fit) {
     });
     if (fit && patients.length) map.fitBounds(bounds, isWide() ? safePadding() : 40);
     setupSchedules(data.schedules || []);
+    var pre = data.precomputed || {};
+    Object.keys(pre).forEach(function(k) {
+        routeCache[k] = pre[k];
+    });
     routeStops = routeStops.map(function(old) {
         return patients.filter(function(p) {
             return sameStop(p, old);
@@ -1185,7 +1189,7 @@ function routeChanged() {
 }
 var autoCalc = false;
 var recalcTimer = null;
-var RECALC_DELAY_MS = 1e3;
+var RECALC_DELAY_MS = 500;
 function editRoute() {
     routeChanged();
     if (!autoCalc || !routeStops.length) return;
