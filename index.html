@@ -23,6 +23,11 @@
     #loginMsg { color: var(--red); min-height: 1.5em; font-size: 14px; }
     #map { position: absolute; inset: 0; }
     #top { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5; max-width: 420px; }
+    #moved { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: block; padding: 10px 14px; background: #fef7e0; color: var(--text);
+             font-size: 14px; line-height: 1.5; text-decoration: none; box-shadow: var(--shadow); }
+    #moved b { color: var(--blue); font-weight: 500; }
+    body.moved #top { top: 94px; }
+    body.moved #login { margin-top: calc(12vh + 60px); }
     #searchBox { display: flex; align-items: center; height: 48px; background: #fff; border-radius: 24px; box-shadow: var(--shadow); padding: 0 4px 0 16px; }
     #searchBox .lead { color: var(--sub); flex: none; }
     #search { flex: 1; min-width: 0; border: 0; outline: 0; font-size: 16px; padding: 0 10px; background: transparent; }
@@ -117,6 +122,7 @@
   </style>
 </head>
 <body>
+  <a id="moved" class="hidden" target="_top" href="https://ytsujimoto0108.github.io/rmap/">地図のURLが新しくなりました。<b>新しいURLを開く ›</b><br>開いたら、ブックマークやホーム画面のアイコンを新しいURLに入れ替えてください</a>
   <form id="login" class="hidden">
     <h1>おく内科訪問患者マップ</h1>
     <input id="loginId" placeholder="ID" autocomplete="username" autocapitalize="off">
@@ -235,6 +241,10 @@ function $(id) {
 }
 var API_URL = "https://script.google.com/macros/s/AKfycbzFBDYgC_OaMd1Rd6FtMjNKpkXo_dwQynrGM4BEv2hP_yrWHCchyMn7jI_lIfCLsmo8RA/exec";
 var API_FUNCTIONS = [ "login", "logout", "getMapData", "refreshMap", "computeRoute" ];
+if (window.google && google.script && google.script.run) {
+    $("moved").classList.remove("hidden");
+    document.body.classList.add("moved");
+}
 function server() {
     if (window.google && google.script && google.script.run) return google.script.run;
     var ok = function() {}, ng = function() {};
