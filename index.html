@@ -146,7 +146,7 @@
       <div id="suggest" class="hidden"></div>
       <div id="chips">
         <span id="countChip" class="chip">読み込み中…</span>
-        <span id="issueChip" class="chip warn hidden"></span>
+        <button id="issueChip" class="chip warn hidden" type="button"></button>
         <button id="missingChip" class="chip warn hidden" type="button"></button>
         <button id="routeChip" class="chip hidden" type="button"><span data-icon="route"></span><span id="routeChipText"></span></button>
       </div>
@@ -476,7 +476,9 @@ function drawPatients(data, fit) {
     $("countChip").textContent = patients.length + "名" + (data.lastRun ? "・" + data.lastRun.replace(/^\d{4}\//, "") + " 更新" : "");
     if (data.issueCount > 0) {
         $("issueChip").textContent = "要確認 " + data.issueCount + "件";
-        $("issueChip").title = "地図に出ていない・位置が不確かな患者がいます（「ジオコード要確認」シート）";
+        $("issueChip").title = "「訪問開始」シートで確認してください\n" + (data.issues || []).map(function(it) {
+            return "・" + it.name + "（" + it.row + "行目）: " + it.reason;
+        }).join("\n");
         $("issueChip").classList.remove("hidden");
     } else {
         $("issueChip").classList.add("hidden");
@@ -742,6 +744,13 @@ function renderScheduleChips() {
     }
     placeFabs();
 }
+$("issueChip").addEventListener("click", function() {
+    selected = null;
+    missingOpen = "issues";
+    renderMissing();
+    $("sheet").classList.remove("collapsed");
+    showSheet();
+});
 $("missingChip").addEventListener("click", function() {
     selected = null;
     missingOpen = true;
@@ -781,6 +790,29 @@ function renderPlaceVisits(p) {
 function renderMissing() {
     var box = $("missing");
     box.innerHTML = "";
+    if (missingOpen === "issues") {
+        (window.__mapData.issues || []).forEach(function(it) {
+            var row = document.createElement("div");
+            row.className = "visit";
+            var body = document.createElement("div");
+            var name = document.createElement("div");
+            name.style.fontWeight = "500";
+            name.textContent = it.name;
+            var where = document.createElement("div");
+            where.className = "sub";
+            where.textContent = "「訪問開始」シート " + it.row + " 行目";
+            var reason = document.createElement("div");
+            reason.className = "sub";
+            reason.style.color = "#d93025";
+            reason.textContent = it.reason;
+            body.appendChild(name);
+            body.appendChild(where);
+            body.appendChild(reason);
+            row.appendChild(body);
+            box.appendChild(row);
+        });
+        return;
+    }
     var day = currentDay();
     if (!day) return;
     day.visits.filter(function(v) {
@@ -851,6 +883,9 @@ function showSheet() {
         h.textContent = selected.name;
         var i = routeIndex(selected);
         sub.textContent = i >= 0 ? "ルートの " + (i + 1) + " 番目" : "訪問患者";
+    } else if (missingOpen === "issues") {
+        h.textContent = "要確認";
+        sub.textContent = "住所から位置を取れない・位置が不確かな患者。シートを直したら、メニューの「地図を更新」で反映";
     } else if (missingOpen) {
         h.textContent = "地図にない予定";
         sub.textContent = dayLabel(viewDate) + "の予定のうち、地図の患者と結びつかなかったもの";
