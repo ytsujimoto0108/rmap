@@ -261,7 +261,8 @@ function server() {
     API_FUNCTIONS.forEach(function(fn) {
         runner[fn] = function() {
             var args = Array.prototype.slice.call(arguments);
-            var send = function(retry) {
+            var waits = fn === "refreshMap" ? [] : [ 2e3, 4e3, 8e3 ];
+            var send = function(attempt) {
                 fetch(API_URL, {
                     method: "POST",
                     headers: {
@@ -274,19 +275,25 @@ function server() {
                     }),
                     credentials: "omit"
                 }).then(function(r) {
-                    return r.text();
-                }).then(function(text) {
+                    return r.text().then(function(text) {
+                        return {
+                            status: r.status,
+                            text: text
+                        };
+                    });
+                }).then(function(got) {
                     var res;
                     try {
-                        res = JSON.parse(text);
+                        res = JSON.parse(got.text);
                     } catch (e) {
-                        if (retry) {
+                        if (attempt < waits.length) {
                             setTimeout(function() {
-                                send(false);
-                            }, 2e3);
+                                send(attempt + 1);
+                            }, waits[attempt]);
                             return;
                         }
-                        throw new Error("サーバーの応答を読めませんでした");
+                        var title = (got.text.match(/<title>([^<]*)/i) || [])[1] || got.text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+                        throw new Error("サーバーの応答を読めませんでした（" + got.status + " " + title + "）");
                     }
                     if (res && res.apiError) throw new Error(res.apiError);
                     ok(res);
@@ -294,7 +301,7 @@ function server() {
                     ng(e instanceof Error ? e : new Error(String(e)));
                 });
             };
-            send(fn !== "refreshMap");
+            send(0);
         };
     });
     return runner;
