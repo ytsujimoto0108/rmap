@@ -527,6 +527,7 @@ function drawPatients(data, fit) {
     if (selected) selected = patients.filter(function(p) {
         return sameStop(p, selected);
     })[0] || null;
+    markSelected(false);
     routeChanged();
 }
 function sameStop(a, b) {
@@ -594,8 +595,31 @@ function visitShown(v) {
     return !group || groupKey(v) === group;
 }
 function applyView() {
+    patients.forEach(styleMarker);
+    markSelected(false);
+    renderScheduleChips();
+    if (selected) renderPlaceVisits(selected);
+    if (missingOpen) renderMissing();
+}
+function styleMarker(p) {
     var day = currentDay();
-    patients.forEach(function(p) {
+    if (p === selected) {
+        var sv = day && (p.visits[day.date] || [])[0];
+        p.marker.setIcon({
+            path: PIN_PATH,
+            fillColor: sv ? doctorColors[sv.doctor] : "#1a73e8",
+            fillOpacity: 1,
+            strokeColor: "#202124",
+            strokeWeight: 2.5,
+            scale: 2.6,
+            anchor: new google.maps.Point(12, 22),
+            labelOrigin: new google.maps.Point(12, 9)
+        });
+        p.marker.setZIndex(2e3);
+        p.marker.setVisible(true);
+        return;
+    }
+    (function() {
         if (!day) {
             p.marker.setIcon(null);
             p.marker.setZIndex(null);
@@ -641,10 +665,40 @@ function applyView() {
             p.marker.setZIndex(1);
             p.marker.setVisible(true);
         }
-    });
-    renderScheduleChips();
-    if (selected) renderPlaceVisits(selected);
-    if (missingOpen) renderMissing();
+    })();
+}
+var markedSel = null, selHalo = null;
+function markSelected(bounce) {
+    if (markedSel && markedSel !== selected && patients.indexOf(markedSel) >= 0) styleMarker(markedSel);
+    markedSel = selected;
+    if (!selected) {
+        if (selHalo) selHalo.setMap(null);
+        return;
+    }
+    styleMarker(selected);
+    if (!selHalo) {
+        selHalo = new google.maps.Marker({
+            clickable: false,
+            zIndex: 1999,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 16,
+                fillColor: "#1a73e8",
+                fillOpacity: .25,
+                strokeColor: "#1a73e8",
+                strokeWeight: 2
+            }
+        });
+    }
+    selHalo.setPosition(selected.marker.getPosition());
+    selHalo.setMap(map);
+    if (bounce) {
+        var m = selected.marker;
+        m.setAnimation(google.maps.Animation.BOUNCE);
+        setTimeout(function() {
+            m.setAnimation(null);
+        }, 1400);
+    }
 }
 function chip(label, cls, onClick, dotColor, square) {
     var b = document.createElement("button");
@@ -865,6 +919,7 @@ function routeFromView() {
 }
 function showSheet() {
     var sheet = $("sheet");
+    if (markedSel !== selected) markSelected(!!selected);
     if (selected) missingOpen = false;
     $("place").classList.toggle("hidden", !selected);
     $("missing").classList.toggle("hidden", !missingOpen);
