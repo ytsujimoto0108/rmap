@@ -621,7 +621,16 @@ function styleMarker(p) {
     }
     (function() {
         if (!day) {
-            p.marker.setIcon(null);
+            p.marker.setIcon(routeStops.indexOf(p) >= 0 ? {
+                path: PIN_PATH,
+                fillColor: "#1a73e8",
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 1.5,
+                scale: 1.7,
+                anchor: new google.maps.Point(12, 22),
+                labelOrigin: new google.maps.Point(12, 9)
+            } : null);
             p.marker.setZIndex(null);
             p.marker.setVisible(true);
             return;
@@ -1329,10 +1338,15 @@ function stopRow(numText, isClinic, name, timeText, subText, target, controls) {
     return row;
 }
 var PREP_SEC = 5 * 60;
+var routeStyled = [];
 function renderRoute() {
     patients.forEach(function(p) {
         if (p.marker) p.marker.setLabel(null);
     });
+    routeStyled.concat(routeStops).forEach(function(p) {
+        if (p.marker && patients.indexOf(p) >= 0) styleMarker(p);
+    });
+    routeStyled = routeStops.slice();
     routeStops.forEach(function(p, i) {
         if (p.marker) p.marker.setLabel({
             text: String(i + 1),
