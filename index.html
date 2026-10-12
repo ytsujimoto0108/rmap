@@ -80,7 +80,7 @@
     .route-opts input { font-size: 16px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--text); }
     .route-opts input[type=number] { width: 4em; }
     .stop { display: flex; align-items: center; gap: 12px; padding: 15px 0; border-top: 1px solid #f1f3f4; }
-    .stop .num { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--red); color: #fff; text-align: center; line-height: 26px; font-weight: bold; font-size: 13px; }
+    .stop .num { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--blue); color: #fff; text-align: center; line-height: 26px; font-weight: bold; font-size: 13px; }
     .stop .num.clinic { background: var(--green); }
     .stop .body { flex: 1; min-width: 0; }
     .stop .name { font-size: 15px; }
@@ -627,11 +627,11 @@ function styleMarker(p) {
                 fillOpacity: 1,
                 strokeColor: "#fff",
                 strokeWeight: 1.5,
-                scale: 1.7,
+                scale: 2.1,
                 anchor: new google.maps.Point(12, 22),
                 labelOrigin: new google.maps.Point(12, 9)
             } : null);
-            p.marker.setZIndex(null);
+            p.marker.setZIndex(routeStops.indexOf(p) >= 0 ? 1500 : null);
             p.marker.setVisible(true);
             return;
         }
@@ -1038,7 +1038,9 @@ $("placeRoute").addEventListener("click", function() {
         toast(selected.name + " をルートから外しました");
     } else {
         addToRoute(selected);
-        renderPlaceRouteButton();
+        selected = null;
+        missingOpen = false;
+        $("sheet").classList.remove("collapsed");
         showSheet();
         return;
     }
