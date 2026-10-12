@@ -1042,11 +1042,13 @@ $("placeRoute").addEventListener("click", function() {
         missingOpen = false;
         $("sheet").classList.remove("collapsed");
         showSheet();
+        fitRoute();
         return;
     }
     editRoute();
     renderPlaceRouteButton();
     showSheet();
+    fitRoute();
 });
 function navUrl(p) {
     return "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + p.lat + "," + p.lng;
@@ -1394,6 +1396,7 @@ function renderRoute() {
             routeStops.splice(i, 1);
             addAt = null;
             editRoute();
+            fitRoute();
         }) ]));
         list.appendChild(addSlot(i + 1));
         if (addAt === i + 1) list.appendChild(addPanel());
@@ -1435,6 +1438,36 @@ function renderRoute() {
         }
     } else {
         list.appendChild(stopRow("院", true, "クリニック帰着", "", "", null));
+        if (routeStops.length && clinic) {
+            var straight = [ {
+                lat: clinic.lat,
+                lng: clinic.lng
+            } ].concat(routeStops.map(function(p) {
+                return {
+                    lat: p.lat,
+                    lng: p.lng
+                };
+            }), [ {
+                lat: clinic.lat,
+                lng: clinic.lng
+            } ]);
+            routeLine = new google.maps.Polyline({
+                path: straight,
+                map: map,
+                strokeOpacity: 0,
+                icons: [ {
+                    icon: {
+                        path: "M 0,-1 0,1",
+                        strokeColor: "#1a73e8",
+                        strokeOpacity: .9,
+                        strokeWeight: 3,
+                        scale: 3
+                    },
+                    offset: "0",
+                    repeat: "14px"
+                } ]
+            });
+        }
     }
     if (addAt === null || addAt > routeStops.length) {
         addAt = null;
@@ -1530,6 +1563,7 @@ function renderAddList() {
         row.appendChild(plus);
         row.addEventListener("click", function() {
             addToRoute(p, addAt);
+            fitRoute();
         });
         box.appendChild(row);
     });
@@ -1623,6 +1657,21 @@ function safePadding() {
         left: 30,
         right: 30
     };
+}
+function fitRoute() {
+    if (!routeStops.length) return;
+    var bounds = new google.maps.LatLngBounds;
+    if (clinic) bounds.extend({
+        lat: clinic.lat,
+        lng: clinic.lng
+    });
+    routeStops.forEach(function(p) {
+        bounds.extend({
+            lat: p.lat,
+            lng: p.lng
+        });
+    });
+    map.fitBounds(bounds, safePadding());
 }
 var routeCache = {};
 var routeSeq = 0;
